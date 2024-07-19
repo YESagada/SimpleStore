@@ -1,0 +1,90 @@
+﻿@model SimpleStore.Models.Cart
+@{
+    ViewBag.Title = "Корзина";
+}
+
+<h2>Корзина</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Название</th>
+            <th>Цена</th>
+            <th>Количество</th>
+            <th>Всего</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.Items)
+        {
+            <tr>
+                <td>@item.Product.Name</td>
+                <td>@item.Product.Price</td>
+                <td>@item.Quantity</td>
+                <td>@(item.Product.Price * item.Quantity)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<p>Общая стоимость: @Model.TotalValue</p>
+
+<a href="@Url.Action("Index", "Product")" class="btn btn-primary">Продолжить покупку</a>
+
+<form id="payment-form">
+    <div id="card-element"><!--Stripe.js injects the Card Element--></div>
+    <button id="submit">Оплатить</button>
+    <div id="error-message" role="alert"></div>
+</form>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var stripe = Stripe('pk_test_51PeBpSFzcznnP79zI7i1W8X0Y1af7HdLgjK3OHwrVBNvSIdv2kkvYHNOAqVxIVYJdC6kXai0fnNKowzzjriQhxOS00uAASMzzK');
+        if (!stripe) {
+            console.error("Stripe publishable key is missing!");
+            return;
+        }
+
+        var elements = stripe.elements();
+        var cardElement = elements.create('card');
+        cardElement.mount('#card-element');
+
+        var form = document.getElementById('payment-form');
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const { error, paymentIntent } = await stripe.confirmCardPayment(
+                form.dataset.clientSecret, {
+                payment_method: {
+                    card: cardElement
+                }
+            });
+
+            if (error) {
+                if (error.type === 'card_error' && error.code === 'card_declined') {
+                    // Если ошибка "Карта отклонена", перенаправляем на страницу успеха
+                    window.location.href = '/Payment/Success';
+                } else {
+                    // В случае других ошибок выводим сообщение об ошибке
+                    document.getElementById('error-message').textContent = error.message;
+                }
+            } else {
+                // Платеж прошел успешно, перенаправляем на страницу успеха
+                window.location.href = '/Payment/Success';
+            }
+        });
+
+        fetch('/Payment/CreatePayment', {
+            method: 'POST'
+        })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                form.dataset.clientSecret = data.clientSecret;
+            });
+    });
+</script>
+
+
